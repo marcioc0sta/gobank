@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -10,19 +11,31 @@ import (
 
 func (s *APIServer) Run() {
 	router := mux.NewRouter()
-	router.HandleFunc("/account", makeHttpHandleFunc(s.handleGetAccount)).Methods("GET")
+	router.HandleFunc("/account", makeHttpHandleFunc(s.handleAccount))
+	router.HandleFunc("/account/{id}", makeHttpHandleFunc(s.handleGetAccount)).Methods("GET")
 	log.Println("Listening on: ", s.listenAddr)
 	http.ListenAndServe(s.listenAddr, router)
 }
 
 func (s *APIServer) handleAccount(w http.ResponseWriter, r *http.Request) error {
-	return nil
+	if r.Method == "GET" {
+		return s.handleAccount(w, r)
+	}
+	if r.Method == "POST" {
+		return s.handleCreateAccount(w, r)
+	}
+	if r.Method == "DELETE" {
+		return s.handleDeleteAccount(w, r)
+	}
+
+	return fmt.Errorf("unsupported method: %s", r.Method)
 }
 
 func (s *APIServer) handleGetAccount(w http.ResponseWriter, r *http.Request) error {
-	account := NewAccount("John", "Doe")
+	id := mux.Vars(r)["id"]
+	fmt.Println("id: ", id)
 
-	return WriteJson(w, http.StatusOK, account)
+	return WriteJson(w, http.StatusOK, &Account{})
 }
 
 func (s *APIServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) error {
@@ -41,6 +54,7 @@ type APIFunc func(w http.ResponseWriter, r *http.Request) error
 
 type APIServer struct {
 	listenAddr string
+	store      Storage
 }
 
 type ApiError struct {
@@ -61,8 +75,9 @@ func makeHttpHandleFunc(f APIFunc) http.HandlerFunc {
 	}
 }
 
-func NewAPIServer(listenAddr string) *APIServer {
+func NewAPIServer(listenAddr string, store Storage) *APIServer {
 	return &APIServer{
 		listenAddr: listenAddr,
+		store:      store,
 	}
 }
