@@ -12,14 +12,14 @@ import (
 func (s *APIServer) Run() {
 	router := mux.NewRouter()
 	router.HandleFunc("/account", makeHttpHandleFunc(s.handleAccount))
-	router.HandleFunc("/account/{id}", makeHttpHandleFunc(s.handleGetAccount)).Methods("GET")
+	router.HandleFunc("/account/{id}", makeHttpHandleFunc(s.handleGetAccountById)).Methods("GET")
 	log.Println("Listening on: ", s.listenAddr)
 	http.ListenAndServe(s.listenAddr, router)
 }
 
 func (s *APIServer) handleAccount(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "GET" {
-		return s.handleAccount(w, r)
+		return s.handleGetAccount(w, r)
 	}
 	if r.Method == "POST" {
 		return s.handleCreateAccount(w, r)
@@ -32,6 +32,15 @@ func (s *APIServer) handleAccount(w http.ResponseWriter, r *http.Request) error 
 }
 
 func (s *APIServer) handleGetAccount(w http.ResponseWriter, r *http.Request) error {
+	accounts, err := s.store.GetAccounts()
+	if err != nil {
+		return err
+	}
+
+	return WriteJson(w, http.StatusOK, accounts)
+}
+
+func (s *APIServer) handleGetAccountById(w http.ResponseWriter, r *http.Request) error {
 	id := mux.Vars(r)["id"]
 	fmt.Println("id: ", id)
 
@@ -39,7 +48,18 @@ func (s *APIServer) handleGetAccount(w http.ResponseWriter, r *http.Request) err
 }
 
 func (s *APIServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) error {
-	return nil
+	accReq := CreateAccountReq{}
+	if err := json.NewDecoder(r.Body).Decode(&accReq); err != nil {
+		return err
+	}
+
+	account := NewAccount(accReq.FirstName, accReq.LastName)
+
+	if err := s.store.CreateAccount(account); err != nil {
+		return err
+	}
+
+	return WriteJson(w, http.StatusOK, account)
 }
 
 func (s *APIServer) handleDeleteAccount(w http.ResponseWriter, r *http.Request) error {
